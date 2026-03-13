@@ -86,6 +86,16 @@ export const api = {
     return fetch(`/api/import/markdown${qs}`, { method: 'POST', headers, body: formData }).then(handleRes)
   },
 
+  // Images
+  uploadImage: (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const headers: Record<string, string> = {}
+    const token = localStorage.getItem('leaf_token')
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    return fetch('/api/images', { method: 'POST', headers, body: formData }).then(handleRes)
+  },
+
   // Settings
   getSettings: () =>
     fetch('/api/settings', { headers: getHeaders() }).then(handleRes),

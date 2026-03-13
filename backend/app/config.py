@@ -6,6 +6,7 @@ DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 CONFIG_FILE = DATA_DIR / "config.yaml"
 DB_PATH = DATA_DIR / "leaf.db"
 NOTES_DIR = DATA_DIR / "notes"
+IMAGES_DIR = DATA_DIR / "images"
 
 APP_VERSION = os.environ.get("APP_VERSION", "dev")
 
@@ -13,6 +14,7 @@ APP_VERSION = os.environ.get("APP_VERSION", "dev")
 def ensure_dirs():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     NOTES_DIR.mkdir(parents=True, exist_ok=True)
+    IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def load_config() -> dict:

@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse
 from pathlib import Path
 from app.database import Base, engine
 from app.config import APP_VERSION
-from app.routers import notes, folders, tags, search, export_import, settings
+from app.routers import notes, folders, tags, search, export_import, settings, images
 
 Base.metadata.create_all(bind=engine)
 
@@ -31,6 +31,7 @@ app.include_router(tags.router)
 app.include_router(search.router)
 app.include_router(export_import.router)
 app.include_router(settings.router)
+app.include_router(images.router)
 
 STATIC_DIR = Path("/app/static")
 

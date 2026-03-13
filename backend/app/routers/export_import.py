@@ -99,6 +99,45 @@ def parse_frontmatter(text: str) -> tuple[dict, str]:
     return meta, content
 
 
+@router.put("/import/note/{note_id}")
+async def import_replace_note(
+    note_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _=Depends(require_auth),
+):
+    note = db.query(Note).options(joinedload(Note.tags)).filter(Note.id == note_id).first()
+    if not note:
+        raise HTTPException(404, "Note not found")
+
+    raw = await file.read()
+    text = raw.decode("utf-8")
+    meta, body = parse_frontmatter(text)
+
+    if "title" in meta:
+        note.title = meta["title"]
+        note.slug = slugify(meta["title"])
+    note.content = body
+    if "public" in meta:
+        note.is_public = meta["public"]
+    if "pinned" in meta:
+        note.pinned = meta["pinned"]
+    if "tags" in meta and isinstance(meta["tags"], list):
+        tags = []
+        for tname in meta["tags"]:
+            tag = db.query(Tag).filter(Tag.name == tname.lower()).first()
+            if not tag:
+                tag = Tag(name=tname.lower())
+                db.add(tag)
+                db.flush()
+            tags.append(tag)
+        note.tags = tags
+
+    db.commit()
+    db.refresh(note)
+    return {"id": note.id, "title": note.title, "updated": True}
+
+
 @router.post("/import/markdown", response_model=ImportResult)
 async def import_markdown(
     files: list[UploadFile] = File(...),
