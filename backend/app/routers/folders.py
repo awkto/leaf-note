@@ -29,6 +29,73 @@ def build_tree(folders: list[Folder], parent_id: int | None = None) -> list[Fold
     return result
 
 
+def resolve_folder_path(db: Session, path: str) -> Folder | None:
+    """Resolve a slash-separated folder path like 'infrastructure/docker' to a Folder."""
+    parts = [p.strip() for p in path.strip("/").split("/") if p.strip()]
+    parent_id = None
+    folder = None
+    for part in parts:
+        slug = slugify(part)
+        folder = db.query(Folder).filter(
+            Folder.slug == slug, Folder.parent_id == parent_id
+        ).first()
+        if not folder:
+            # Try matching by name (case-insensitive)
+            folder = db.query(Folder).filter(
+                Folder.name.ilike(part), Folder.parent_id == parent_id
+            ).first()
+        if not folder:
+            return None
+        parent_id = folder.id
+    return folder
+
+
+def ensure_folder_path(db: Session, path: str) -> Folder:
+    """Resolve or create the full folder path, returning the deepest folder."""
+    parts = [p.strip() for p in path.strip("/").split("/") if p.strip()]
+    parent_id = None
+    folder = None
+    for part in parts:
+        slug = slugify(part)
+        folder = db.query(Folder).filter(
+            Folder.slug == slug, Folder.parent_id == parent_id
+        ).first()
+        if not folder:
+            folder = db.query(Folder).filter(
+                Folder.name.ilike(part), Folder.parent_id == parent_id
+            ).first()
+        if not folder:
+            folder = Folder(name=part, slug=slug, parent_id=parent_id)
+            db.add(folder)
+            db.flush()
+        parent_id = folder.id
+    return folder
+
+
+def build_folder_breadcrumb(db: Session, folder_id: int | None) -> str:
+    """Build a slash-separated path from folder_id up to root."""
+    if not folder_id:
+        return ""
+    parts = []
+    fid = folder_id
+    while fid:
+        f = db.get(Folder, fid)
+        if not f:
+            break
+        parts.insert(0, f.name)
+        fid = f.parent_id
+    return "/".join(parts)
+
+
+@router.get("/by-path/{path:path}", response_model=FolderOut)
+def get_folder_by_path(path: str, db: Session = Depends(get_db), _=Depends(require_auth)):
+    """Look up a folder by path like /api/folders/by-path/infrastructure/docker"""
+    folder = resolve_folder_path(db, path)
+    if not folder:
+        raise HTTPException(404, f"Folder not found: {path}")
+    return folder
+
+
 @router.get("", response_model=list[FolderOut])
 def list_folders(parent_id: int | None = None, db: Session = Depends(get_db), _=Depends(require_auth)):
     q = db.query(Folder)

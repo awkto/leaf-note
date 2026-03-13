@@ -81,6 +81,27 @@ class NoteSummary(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class NoteOutFull(NoteOut):
+    """Extended note with folder path for API consumers."""
+    folder_path: str | None = None
+
+
+class NoteSummaryFull(NoteSummary):
+    """Extended summary with folder path."""
+    folder_path: str | None = None
+
+
+class QuickNoteCreate(BaseModel):
+    """LLM-friendly: create or update a note by title, with optional folder path."""
+    title: str
+    content: str = ""
+    folder: str | None = None  # path like "infrastructure/docker" - created if missing
+    tags: list[str] = []
+    is_public: bool = False
+    pinned: bool = False
+    upsert: bool = False  # if true, update existing note with same title in same folder
+
+
 class SearchResult(BaseModel):
     notes: list[NoteSummary]
     total: int
