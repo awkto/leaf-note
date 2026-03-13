@@ -67,6 +67,17 @@ def create_note(body: NoteCreate, db: Session = Depends(get_db), _=Depends(requi
     return note
 
 
+@router.get("/by-slug/{slug}", response_model=NoteOut)
+def get_note_by_slug(slug: str, db: Session = Depends(get_db), user=Depends(require_auth_or_public)):
+    note = db.query(Note).options(joinedload(Note.tags)).filter(Note.slug == slug).first()
+    if not note:
+        raise HTTPException(404, "Note not found")
+    from app.config import get_auth_enabled
+    if get_auth_enabled() and user is None and not note.is_public:
+        raise HTTPException(404, "Note not found")
+    return note
+
+
 @router.get("/{note_id}", response_model=NoteOut)
 def get_note(note_id: int, db: Session = Depends(get_db), user=Depends(require_auth_or_public)):
     note = db.query(Note).options(joinedload(Note.tags)).filter(Note.id == note_id).first()
@@ -108,6 +119,16 @@ def delete_note(note_id: int, db: Session = Depends(get_db), _=Depends(require_a
         raise HTTPException(404, "Note not found")
     db.delete(note)
     db.commit()
+
+
+@router.get("/public/list", response_model=list[NoteSummary])
+def list_public_notes(
+    limit: int = Query(100, le=1000),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    q = db.query(Note).options(joinedload(Note.tags)).filter(Note.is_public == True)
+    return q.order_by(Note.updated_at.desc()).offset(offset).limit(limit).all()
 
 
 @router.get("/public/{note_id}", response_model=NoteOut)
