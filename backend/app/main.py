@@ -1,0 +1,36 @@
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from pathlib import Path
+from app.database import Base, engine
+from app.config import APP_VERSION
+from app.routers import notes, folders, tags, search, export_import, settings
+
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(
+    title="Leaf Note",
+    description="Markdown-focused note-taking API for humans and LLMs",
+    version=APP_VERSION,
+    docs_url="/apidocs",
+    openapi_url="/openapi.json",
+)
+
+app.include_router(notes.router)
+app.include_router(folders.router)
+app.include_router(tags.router)
+app.include_router(search.router)
+app.include_router(export_import.router)
+app.include_router(settings.router)
+
+STATIC_DIR = Path("/app/static")
+
+if STATIC_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        file_path = STATIC_DIR / full_path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(STATIC_DIR / "index.html")
