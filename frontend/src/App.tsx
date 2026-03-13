@@ -1,5 +1,5 @@
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { api } from './api'
 import { FolderTree, FolderNoteRef, NoteSummary, Settings as SettingsType } from './types'
 import NotesPage from './pages/NotesPage'
@@ -9,15 +9,20 @@ import SettingsPage from './pages/SettingsPage'
 import LoginPage from './pages/LoginPage'
 import {
   FileText, Search, Settings, FolderOpen, ChevronRight, ChevronDown,
-  Plus, Leaf, Pin, Home
+  Plus, Leaf, Pin, Home, Lock, Unlock
 } from 'lucide-react'
 
-function NoteItem({ note, active }: { note: FolderNoteRef | NoteSummary; active: boolean }) {
+function NoteItem({ note, active, editMode, onDragStart }: {
+  note: FolderNoteRef | NoteSummary; active: boolean;
+  editMode: boolean; onDragStart?: (e: React.DragEvent, noteId: number) => void
+}) {
   const navigate = useNavigate()
   return (
     <div
-      className={`sidebar-note ${active ? 'active' : ''}`}
+      className={`sidebar-note ${active ? 'active' : ''} ${editMode ? 'draggable' : ''}`}
       onClick={() => navigate(`/note/${note.id}`)}
+      draggable={editMode}
+      onDragStart={editMode ? (e) => onDragStart?.(e, note.id) : undefined}
     >
       {note.pinned && <Pin size={10} className="pin-icon" />}
       <span>{note.title}</span>
@@ -25,20 +30,42 @@ function NoteItem({ note, active }: { note: FolderNoteRef | NoteSummary; active:
   )
 }
 
-function FolderTreeItem({ folder, depth = 0, pathPrefix = '', activePath, activeNoteId, onSelect }: {
+function FolderTreeItem({ folder, depth = 0, pathPrefix = '', activePath, activeNoteId, onSelect, editMode, onDragStart, onDrop }: {
   folder: FolderTree; depth?: number; pathPrefix?: string;
-  activePath: string; activeNoteId: number | null; onSelect: (path: string) => void
+  activePath: string; activeNoteId: number | null; onSelect: (path: string) => void;
+  editMode: boolean; onDragStart: (e: React.DragEvent, noteId: number) => void;
+  onDrop: (noteId: number, folderId: number | null) => void
 }) {
   const [open, setOpen] = useState(true)
+  const [dragOver, setDragOver] = useState(false)
   const hasChildren = folder.children.length > 0 || folder.notes.length > 0
   const folderPath = pathPrefix ? `${pathPrefix}/${folder.slug}` : folder.slug
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!editMode) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOver(true)
+  }
+
+  const handleDragLeave = () => setDragOver(false)
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    const noteId = Number(e.dataTransfer.getData('text/plain'))
+    if (noteId) onDrop(noteId, folder.id)
+  }
 
   return (
     <div>
       <div
-        className={`folder-item ${activePath === folderPath ? 'active' : ''}`}
+        className={`folder-item ${activePath === folderPath ? 'active' : ''} ${dragOver ? 'drag-over' : ''}`}
         style={{ paddingLeft: 12 + depth * 16 }}
         onClick={() => onSelect(folderPath)}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
       >
         {hasChildren ? (
           <span onClick={(e) => { e.stopPropagation(); setOpen(!open) }}>
@@ -53,10 +80,12 @@ function FolderTreeItem({ folder, depth = 0, pathPrefix = '', activePath, active
         <div className="folder-children">
           {folder.children.map(c => (
             <FolderTreeItem key={c.id} folder={c} depth={depth + 1}
-              pathPrefix={folderPath} activePath={activePath} activeNoteId={activeNoteId} onSelect={onSelect} />
+              pathPrefix={folderPath} activePath={activePath} activeNoteId={activeNoteId}
+              onSelect={onSelect} editMode={editMode} onDragStart={onDragStart} onDrop={onDrop} />
           ))}
           {folder.notes.map(n => (
-            <NoteItem key={n.id} note={n} active={activeNoteId === n.id} />
+            <NoteItem key={n.id} note={n} active={activeNoteId === n.id}
+              editMode={editMode} onDragStart={onDragStart} />
           ))}
         </div>
       )}
@@ -73,6 +102,8 @@ export default function App() {
   const [newFolderName, setNewFolderName] = useState('')
   const [authRequired, setAuthRequired] = useState(false)
   const [globalDefaultView, setGlobalDefaultView] = useState<string>('source')
+  const [editMode, setEditMode] = useState(false)
+  const [rootDragOver, setRootDragOver] = useState(false)
 
   // Extract active folder path from URL
   const activePath = location.pathname.startsWith('/notes/')
@@ -121,6 +152,16 @@ export default function App() {
     setShowNewFolder(false)
     loadFolders()
   }
+
+  const handleDragStart = useCallback((e: React.DragEvent, noteId: number) => {
+    e.dataTransfer.setData('text/plain', String(noteId))
+    e.dataTransfer.effectAllowed = 'move'
+  }, [])
+
+  const handleDrop = useCallback(async (noteId: number, folderId: number | null) => {
+    await api.updateNote(noteId, { folder_id: folderId })
+    loadFolders()
+  }, [])
 
   if (location.pathname === '/login') {
     return <LoginPage />
@@ -172,17 +213,43 @@ export default function App() {
               activePath={activePath}
               activeNoteId={activeNoteId}
               onSelect={(path) => navigate(`/notes/${path}`)}
+              editMode={editMode}
+              onDragStart={handleDragStart}
+              onDrop={handleDrop}
             />
           ))}
 
           {rootNotes.length > 0 && (
             <>
-              <div className="sidebar-section">Uncategorized</div>
+              <div
+                className={`sidebar-section ${rootDragOver ? 'drag-over' : ''}`}
+                onDragOver={editMode ? (e) => { e.preventDefault(); setRootDragOver(true) } : undefined}
+                onDragLeave={() => setRootDragOver(false)}
+                onDrop={editMode ? (e) => {
+                  e.preventDefault()
+                  setRootDragOver(false)
+                  const noteId = Number(e.dataTransfer.getData('text/plain'))
+                  if (noteId) handleDrop(noteId, null)
+                } : undefined}
+              >
+                Uncategorized
+              </div>
               {rootNotes.map(n => (
-                <NoteItem key={n.id} note={n} active={activeNoteId === n.id} />
+                <NoteItem key={n.id} note={n} active={activeNoteId === n.id}
+                  editMode={editMode} onDragStart={handleDragStart} />
               ))}
             </>
           )}
+        </div>
+        <div className="sidebar-footer">
+          <button
+            className={`btn-ghost btn-sm ${editMode ? 'active' : ''}`}
+            onClick={() => setEditMode(!editMode)}
+            title={editMode ? 'Lock sidebar' : 'Enable drag & drop'}
+          >
+            {editMode ? <Unlock size={14} /> : <Lock size={14} />}
+            <span style={{ marginLeft: 4, fontSize: 11 }}>{editMode ? 'Editing' : 'Locked'}</span>
+          </button>
         </div>
       </div>
       <div className="main-content">

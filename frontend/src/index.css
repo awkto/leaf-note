@@ -167,6 +167,22 @@ textarea { resize: vertical; min-height: 200px; }
 .sidebar-note:hover { color: var(--text); background: var(--bg-tertiary); }
 .sidebar-note.active { color: var(--accent); background: var(--bg-tertiary); }
 .sidebar-note span { overflow: hidden; text-overflow: ellipsis; }
+.sidebar-note.draggable { cursor: grab; }
+.sidebar-note.draggable:active { cursor: grabbing; opacity: 0.5; }
+
+.folder-item.drag-over, .sidebar-section.drag-over {
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius);
+}
+
+.sidebar-footer {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+}
+.sidebar-footer .btn-ghost.active { color: var(--accent); }
 
 .main-content {
   flex: 1;

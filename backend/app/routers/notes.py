@@ -214,7 +214,7 @@ def update_note(note_id: int, body: NoteUpdate, db: Session = Depends(get_db), _
         note.slug = slugify(body.title)
     if body.content is not None:
         note.content = body.content
-    if body.folder_id is not None:
+    if 'folder_id' in body.model_fields_set:
         note.folder_id = body.folder_id
     if body.is_public is not None:
         note.is_public = body.is_public
