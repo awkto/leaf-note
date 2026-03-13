@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api'
 import { Settings as SettingsType } from '../types'
-import { Key, Shield, RefreshCw, Copy } from 'lucide-react'
+import { Key, Shield, RefreshCw, Copy, Eye } from 'lucide-react'
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<SettingsType | null>(null)
@@ -70,6 +70,35 @@ export default function SettingsPage() {
                 </button>
               </div>
             )}
+
+            <div style={{ marginBottom: 32 }}>
+              <h3 className="flex items-center gap-2 mb-2">
+                <Eye size={18} /> Default View
+              </h3>
+              <p className="text-sm text-muted mb-2">
+                Choose the default view when opening notes. Can be overridden per folder or per note.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  className={settings.default_view === 'source' ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
+                  onClick={async () => {
+                    await api.setDefaultView('source')
+                    setSettings(prev => prev ? { ...prev, default_view: 'source' } : null)
+                  }}
+                >
+                  Source (Editor)
+                </button>
+                <button
+                  className={settings.default_view === 'preview' ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
+                  onClick={async () => {
+                    await api.setDefaultView('preview')
+                    setSettings(prev => prev ? { ...prev, default_view: 'preview' } : null)
+                  }}
+                >
+                  Preview (Rendered)
+                </button>
+              </div>
+            </div>
 
             <div style={{ marginBottom: 32 }}>
               <h3 className="mb-2">Version</h3>

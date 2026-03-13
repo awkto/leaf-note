@@ -21,6 +21,7 @@ def build_tree(folders: list[Folder], parent_id: int | None = None) -> list[Fold
             result.append(FolderTree(
                 id=f.id, name=f.name, slug=f.slug,
                 parent_id=f.parent_id,
+                default_view=f.default_view,
                 created_at=f.created_at, updated_at=f.updated_at,
                 children=children,
                 note_count=len(f.notes),
@@ -48,7 +49,7 @@ def create_folder(body: FolderCreate, db: Session = Depends(get_db), _=Depends(r
         parent = db.get(Folder, body.parent_id)
         if not parent:
             raise HTTPException(404, "Parent folder not found")
-    folder = Folder(name=body.name, slug=slugify(body.name), parent_id=body.parent_id)
+    folder = Folder(name=body.name, slug=slugify(body.name), parent_id=body.parent_id, default_view=body.default_view)
     db.add(folder)
     db.commit()
     db.refresh(folder)
@@ -73,6 +74,8 @@ def update_folder(folder_id: int, body: FolderUpdate, db: Session = Depends(get_
         folder.slug = slugify(body.name)
     if body.parent_id is not None:
         folder.parent_id = body.parent_id
+    if body.default_view is not None:
+        folder.default_view = body.default_view if body.default_view != "" else None
     db.commit()
     db.refresh(folder)
     return folder

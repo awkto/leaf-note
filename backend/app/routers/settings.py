@@ -13,6 +13,7 @@ def get_settings(_=Depends(require_auth)):
         auth_enabled=cfg.get("auth_enabled", False),
         api_key=cfg.get("api_key"),
         version=APP_VERSION,
+        default_view=cfg.get("default_view", "source"),
     )
 
 
@@ -46,6 +47,17 @@ def regenerate_api_key(_=Depends(require_auth)):
         raise HTTPException(400, "Auth is not enabled")
     key = generate_api_key()
     return {"api_key": key}
+
+
+@router.put("/settings/default-view")
+def set_default_view(body: dict, _=Depends(require_auth)):
+    view = body.get("default_view", "source")
+    if view not in ("source", "preview"):
+        raise HTTPException(400, "default_view must be 'source' or 'preview'")
+    cfg = load_config()
+    cfg["default_view"] = view
+    save_config(cfg)
+    return {"default_view": view}
 
 
 @router.get("/health")

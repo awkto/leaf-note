@@ -1,7 +1,7 @@
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { api } from './api'
-import { FolderTree } from './types'
+import { FolderTree, Settings } from './types'
 import NotesPage from './pages/NotesPage'
 import EditorPage from './pages/EditorPage'
 import SearchPage from './pages/SearchPage'
@@ -55,13 +55,15 @@ export default function App() {
   const [showNewFolder, setShowNewFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
   const [authRequired, setAuthRequired] = useState(false)
+  const [globalDefaultView, setGlobalDefaultView] = useState<string>('source')
 
   useEffect(() => {
     api.health().then(h => {
       loadFolders()
     }).catch(() => {})
-    // Check if auth needed
-    api.getSettings().catch(err => {
+    api.getSettings().then((s: Settings) => {
+      setGlobalDefaultView(s.default_view || 'source')
+    }).catch(err => {
       if (err.message === 'Unauthorized') setAuthRequired(true)
     })
   }, [])
@@ -143,8 +145,8 @@ export default function App() {
       <div className="main-content">
         <Routes>
           <Route path="/" element={<NotesPage folderId={activeFolderId} onRefreshFolders={loadFolders} />} />
-          <Route path="/note/:id" element={<EditorPage onRefreshFolders={loadFolders} />} />
-          <Route path="/note/new" element={<EditorPage onRefreshFolders={loadFolders} />} />
+          <Route path="/note/:id" element={<EditorPage onRefreshFolders={loadFolders} folders={folders} globalDefaultView={globalDefaultView} />} />
+          <Route path="/note/new" element={<EditorPage onRefreshFolders={loadFolders} folders={folders} globalDefaultView={globalDefaultView} />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Routes>

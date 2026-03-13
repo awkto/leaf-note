@@ -105,6 +105,8 @@ export const api = {
     fetch('/api/auth/setup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ admin_password: password }) }).then(handleRes),
   regenerateApiKey: () =>
     fetch('/api/auth/regenerate-api-key', { method: 'POST', headers: getHeaders() }).then(handleRes),
+  setDefaultView: (view: string) =>
+    fetch('/api/settings/default-view', { method: 'PUT', headers: getHeaders(), body: JSON.stringify({ default_view: view }) }).then(handleRes),
   health: () =>
     fetch('/api/health').then(handleRes),
 }

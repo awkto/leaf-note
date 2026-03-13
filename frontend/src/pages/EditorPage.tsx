@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import { api } from '../api'
-import { Note, Tag } from '../types'
+import { Note, Tag, FolderTree } from '../types'
 import { Save, ArrowLeft, Eye, Edit3, Pin, Globe, Download, Trash2, Image } from 'lucide-react'
 
 function insertAtCursor(
@@ -76,7 +76,38 @@ function prefixLine(
   })
 }
 
-export default function EditorPage({ onRefreshFolders }: { onRefreshFolders: () => void }) {
+function findFolder(folders: FolderTree[], id: number): FolderTree | null {
+  for (const f of folders) {
+    if (f.id === id) return f
+    const found = findFolder(f.children, id)
+    if (found) return found
+  }
+  return null
+}
+
+function resolveDefaultView(
+  noteView: string | null,
+  folderId: number | null,
+  folders: FolderTree[],
+  globalDefault: string,
+): boolean {
+  // Note-level override
+  if (noteView) return noteView === 'preview'
+  // Walk up folder chain
+  if (folderId) {
+    let current = findFolder(folders, folderId)
+    while (current) {
+      if (current.default_view) return current.default_view === 'preview'
+      current = current.parent_id ? findFolder(folders, current.parent_id) : null
+    }
+  }
+  // Global default
+  return globalDefault === 'preview'
+}
+
+export default function EditorPage({ onRefreshFolders, folders = [], globalDefaultView = 'source' }: {
+  onRefreshFolders: () => void; folders?: FolderTree[]; globalDefaultView?: string
+}) {
   const { id } = useParams()
   const navigate = useNavigate()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -95,16 +126,19 @@ export default function EditorPage({ onRefreshFolders }: { onRefreshFolders: () 
 
   useEffect(() => {
     if (id) {
-      api.getNote(Number(id)).then(n => {
+      api.getNote(Number(id)).then((n: Note) => {
         setNote(n)
         setTitle(n.title)
         setContent(n.content)
         setTags(n.tags.map((t: Tag) => t.name))
         setIsPublic(n.is_public)
         setPinned(n.pinned)
+        setShowPreview(resolveDefaultView(n.default_view, n.folder_id, folders, globalDefaultView))
       })
+    } else {
+      setShowPreview(globalDefaultView === 'preview')
     }
-  }, [id])
+  }, [id, folders, globalDefaultView])
 
   const save = useCallback(async () => {
     setSaving(true)

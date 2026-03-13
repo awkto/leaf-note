@@ -58,6 +58,7 @@ def create_note(body: NoteCreate, db: Session = Depends(get_db), _=Depends(requi
         folder_id=body.folder_id,
         is_public=body.is_public,
         pinned=body.pinned,
+        default_view=body.default_view,
     )
     if body.tags:
         note.tags = get_or_create_tags(db, body.tags)
@@ -107,6 +108,8 @@ def update_note(note_id: int, body: NoteUpdate, db: Session = Depends(get_db), _
         note.pinned = body.pinned
     if body.tags is not None:
         note.tags = get_or_create_tags(db, body.tags)
+    if body.default_view is not None:
+        note.default_view = body.default_view if body.default_view != "" else None
     db.commit()
     db.refresh(note)
     return note

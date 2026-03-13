@@ -17,6 +17,7 @@ class TagOut(TagBase):
 class FolderBase(BaseModel):
     name: str
     parent_id: int | None = None
+    default_view: str | None = None  # "source", "preview", or null (inherit)
 
 class FolderCreate(FolderBase):
     pass
@@ -24,6 +25,7 @@ class FolderCreate(FolderBase):
 class FolderUpdate(BaseModel):
     name: str | None = None
     parent_id: int | None = None
+    default_view: str | None = None
 
 class FolderOut(FolderBase):
     id: int
@@ -43,6 +45,7 @@ class NoteBase(BaseModel):
     folder_id: int | None = None
     is_public: bool = False
     pinned: bool = False
+    default_view: str | None = None  # "source", "preview", or null (inherit)
 
 class NoteCreate(NoteBase):
     tags: list[str] = []
@@ -54,6 +57,7 @@ class NoteUpdate(BaseModel):
     is_public: bool | None = None
     pinned: bool | None = None
     tags: list[str] | None = None
+    default_view: str | None = None
 
 class NoteOut(NoteBase):
     id: int
@@ -70,6 +74,7 @@ class NoteSummary(BaseModel):
     folder_id: int | None
     is_public: bool
     pinned: bool
+    default_view: str | None = None
     tags: list[TagOut] = []
     created_at: datetime
     updated_at: datetime
@@ -91,6 +96,7 @@ class SettingsOut(BaseModel):
     auth_enabled: bool
     api_key: str | None = None
     version: str
+    default_view: str = "source"  # global default: "source" or "preview"
 
 
 class SetupRequest(BaseModel):

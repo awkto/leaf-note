@@ -9,6 +9,7 @@ export interface Folder {
   name: string
   slug: string
   parent_id: number | null
+  default_view: string | null
   created_at: string
   updated_at: string
 }
@@ -25,6 +26,7 @@ export interface NoteSummary {
   folder_id: number | null
   is_public: boolean
   pinned: boolean
+  default_view: string | null
   tags: Tag[]
   created_at: string
   updated_at: string
@@ -43,4 +45,5 @@ export interface Settings {
   auth_enabled: boolean
   api_key: string | null
   version: string
+  default_view: string
 }

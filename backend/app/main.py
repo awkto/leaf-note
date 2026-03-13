@@ -3,11 +3,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pathlib import Path
+from sqlalchemy import inspect, text
 from app.database import Base, engine
 from app.config import APP_VERSION
 from app.routers import notes, folders, tags, search, export_import, settings, images
 
 Base.metadata.create_all(bind=engine)
+
+# Migrate: add default_view columns if missing
+with engine.connect() as conn:
+    inspector = inspect(engine)
+    for table in ("notes", "folders"):
+        cols = [c["name"] for c in inspector.get_columns(table)]
+        if "default_view" not in cols:
+            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN default_view VARCHAR(10)"))
+            conn.commit()
 
 app = FastAPI(
     title="Leaf Note",

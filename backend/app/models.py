@@ -18,6 +18,7 @@ class Folder(Base):
     name = Column(String(255), nullable=False)
     slug = Column(String(255), nullable=False)
     parent_id = Column(Integer, ForeignKey("folders.id", ondelete="CASCADE"), nullable=True)
+    default_view = Column(String(10), nullable=True)  # "source", "preview", or null (inherit)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
@@ -36,6 +37,7 @@ class Note(Base):
     folder_id = Column(Integer, ForeignKey("folders.id", ondelete="SET NULL"), nullable=True)
     is_public = Column(Boolean, default=False)
     pinned = Column(Boolean, default=False)
+    default_view = Column(String(10), nullable=True)  # "source", "preview", or null (inherit)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
