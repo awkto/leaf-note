@@ -1,5 +1,5 @@
 import re
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
 from app.models import Note, Tag, note_tags
@@ -37,6 +37,14 @@ def get_or_create_tags(db: Session, tag_names: list[str]) -> list[Tag]:
     return tags
 
 
+def _note_with_permalink(note: Note, request: Request) -> dict:
+    """Add permalink to a note response."""
+    out = NoteOut.model_validate(note).model_dump()
+    base = str(request.base_url).rstrip('/')
+    out['permalink'] = f"{base}/note/{note.id}"
+    return out
+
+
 def _note_summaries(notes: list[Note]) -> list[NoteSummary]:
     return [
         NoteSummary(
@@ -49,6 +57,7 @@ def _note_summaries(notes: list[Note]) -> list[NoteSummary]:
 
 @router.get("")
 def list_notes(
+    request: Request,
     id: int | None = None,
     folder_id: int | None = None,
     root: bool = False,
@@ -67,7 +76,7 @@ def list_notes(
         from app.config import get_auth_enabled
         if get_auth_enabled() and user is None and not note.is_public:
             raise HTTPException(404, "Note not found")
-        return note
+        return _note_with_permalink(note, request)
 
     q = db.query(Note).options(joinedload(Note.tags))
     if root:
@@ -83,7 +92,7 @@ def list_notes(
 
 
 @router.post("", response_model=NoteOut, status_code=201)
-def create_note(body: NoteCreate, db: Session = Depends(get_db), _=Depends(require_auth)):
+def create_note(request: Request, body: NoteCreate, db: Session = Depends(get_db), _=Depends(require_auth)):
     note = Note(
         title=body.title,
         slug=slugify(body.title),
@@ -98,7 +107,7 @@ def create_note(body: NoteCreate, db: Session = Depends(get_db), _=Depends(requi
     db.add(note)
     db.commit()
     db.refresh(note)
-    return note
+    return _note_with_permalink(note, request)
 
 
 @router.post("/quick", response_model=NoteOutFull, status_code=201, tags=["llm"])
@@ -183,29 +192,29 @@ def list_notes_full(
 
 
 @router.get("/by-slug/{slug}", response_model=NoteOut)
-def get_note_by_slug(slug: str, db: Session = Depends(get_db), user=Depends(require_auth_or_public)):
+def get_note_by_slug(request: Request, slug: str, db: Session = Depends(get_db), user=Depends(require_auth_or_public)):
     note = db.query(Note).options(joinedload(Note.tags)).filter(Note.slug == slug).first()
     if not note:
         raise HTTPException(404, "Note not found")
     from app.config import get_auth_enabled
     if get_auth_enabled() and user is None and not note.is_public:
         raise HTTPException(404, "Note not found")
-    return note
+    return _note_with_permalink(note, request)
 
 
 @router.get("/{note_id:int}", response_model=NoteOut)
-def get_note(note_id: int, db: Session = Depends(get_db), user=Depends(require_auth_or_public)):
+def get_note(request: Request, note_id: int, db: Session = Depends(get_db), user=Depends(require_auth_or_public)):
     note = db.query(Note).options(joinedload(Note.tags)).filter(Note.id == note_id).first()
     if not note:
         raise HTTPException(404, "Note not found")
     from app.config import get_auth_enabled
     if get_auth_enabled() and user is None and not note.is_public:
         raise HTTPException(404, "Note not found")
-    return note
+    return _note_with_permalink(note, request)
 
 
 @router.put("/{note_id:int}", response_model=NoteOut)
-def update_note(note_id: int, body: NoteUpdate, db: Session = Depends(get_db), _=Depends(require_auth)):
+def update_note(request: Request, note_id: int, body: NoteUpdate, db: Session = Depends(get_db), _=Depends(require_auth)):
     note = db.query(Note).options(joinedload(Note.tags)).filter(Note.id == note_id).first()
     if not note:
         raise HTTPException(404, "Note not found")
@@ -226,7 +235,7 @@ def update_note(note_id: int, body: NoteUpdate, db: Session = Depends(get_db), _
         note.default_view = body.default_view if body.default_view != "" else None
     db.commit()
     db.refresh(note)
-    return note
+    return _note_with_permalink(note, request)
 
 
 @router.delete("/{note_id:int}", status_code=204)
@@ -249,18 +258,18 @@ def list_public_notes(
 
 
 @router.get("/public/{note_id:int}", response_model=NoteOut)
-def get_public_note(note_id: int, db: Session = Depends(get_db)):
+def get_public_note(request: Request, note_id: int, db: Session = Depends(get_db)):
     note = db.query(Note).options(joinedload(Note.tags)).filter(Note.id == note_id).first()
     if not note:
         raise HTTPException(404, "Note not found")
     from app.config import get_auth_enabled
     if get_auth_enabled() and not note.is_public:
         raise HTTPException(404, "Note not found")
-    return note
+    return _note_with_permalink(note, request)
 
 
 @router.get("/{path:path}")
-def browse_by_path(path: str, db: Session = Depends(get_db), user=Depends(require_auth_or_public)):
+def browse_by_path(request: Request, path: str, db: Session = Depends(get_db), user=Depends(require_auth_or_public)):
     """Path-based browsing: /api/notes/folder/subfolder lists notes, /api/notes/folder/subfolder/note-slug returns a note."""
     path = path.strip("/")
     if not path:
@@ -287,7 +296,7 @@ def browse_by_path(path: str, db: Session = Depends(get_db), user=Depends(requir
                 from app.config import get_auth_enabled
                 if get_auth_enabled() and user is None and not note.is_public:
                     raise HTTPException(404, "Not found")
-                return note
+                return _note_with_permalink(note, request)
 
     # Single segment: try as root-level note slug (no folder)
     if "/" not in path:
@@ -298,6 +307,6 @@ def browse_by_path(path: str, db: Session = Depends(get_db), user=Depends(requir
             from app.config import get_auth_enabled
             if get_auth_enabled() and user is None and not note.is_public:
                 raise HTTPException(404, "Not found")
-            return note
+            return _note_with_permalink(note, request)
 
     raise HTTPException(404, "Not found")

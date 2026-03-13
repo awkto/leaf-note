@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import rehypeRaw from 'rehype-raw'
 import { api } from '../api'
 import { Note, Tag, FolderTree } from '../types'
-import { Save, ArrowLeft, Eye, Edit3, Pin, Globe, Download, Trash2, Image, Columns, Check } from 'lucide-react'
+import { Save, ArrowLeft, Eye, Edit3, Pin, Globe, Download, Trash2, Image, Columns, Check, Link2 } from 'lucide-react'
 
 type ViewMode = 'source' | 'preview' | 'split'
 
@@ -85,6 +85,17 @@ function findFolder(folders: FolderTree[], id: number): FolderTree | null {
   return null
 }
 
+function buildFolderPath(folders: FolderTree[], folderId: number | null): string {
+  if (!folderId) return ''
+  const parts: string[] = []
+  let current = findFolder(folders, folderId)
+  while (current) {
+    parts.unshift(current.slug)
+    current = current.parent_id ? findFolder(folders, current.parent_id) : null
+  }
+  return parts.join('/')
+}
+
 function resolveDefaultView(
   noteView: string | null,
   folderId: number | null,
@@ -118,8 +129,12 @@ function MarkdownPreview({ content }: { content: string }) {
 export default function EditorPage({ onRefreshFolders, folders = [], globalDefaultView = 'source' }: {
   onRefreshFolders: () => void; folders?: FolderTree[]; globalDefaultView?: string
 }) {
-  const { id } = useParams()
+  const { '*': notePath } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  // Determine if path is an ID or a slug path
+  const isNumericId = notePath && /^\d+$/.test(notePath)
+  const id = isNumericId ? notePath : undefined
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -135,33 +150,57 @@ export default function EditorPage({ onRefreshFolders, folders = [], globalDefau
   const [dirty, setDirty] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved' | ''>('')
+  const [copied, setCopied] = useState(false)
+
+  const loadNote = useCallback((n: Note) => {
+    setNote(n)
+    setTitle(n.title)
+    setContent(n.content)
+    setTags(n.tags.map((t: Tag) => t.name))
+    setIsPublic(n.is_public)
+    setPinned(n.pinned)
+    setViewMode(resolveDefaultView(n.default_view, n.folder_id, folders, globalDefaultView))
+    setSaveStatus('saved')
+  }, [folders, globalDefaultView])
+
+  // Redirect ID-based URL to path-based URL
+  useEffect(() => {
+    if (!note || folders.length === 0) return
+    const folderPath = buildFolderPath(folders, note.folder_id)
+    const pathUrl = folderPath
+      ? `/note/${folderPath}/${note.slug}`
+      : `/note/${note.slug}`
+    if (location.pathname !== pathUrl) {
+      navigate(pathUrl, { replace: true })
+    }
+  }, [note, folders])
 
   useEffect(() => {
     if (id) {
-      api.getNote(Number(id)).then((n: Note) => {
-        setNote(n)
-        setTitle(n.title)
-        setContent(n.content)
-        setTags(n.tags.map((t: Tag) => t.name))
-        setIsPublic(n.is_public)
-        setPinned(n.pinned)
-        setViewMode(resolveDefaultView(n.default_view, n.folder_id, folders, globalDefaultView))
-        setSaveStatus('saved')
+      // Load by numeric ID
+      api.getNote(Number(id)).then(loadNote)
+    } else if (notePath && !isNumericId) {
+      // Load by path: use the API path-based endpoint
+      api.browseByPath(notePath).then((result: any) => {
+        if (result && !Array.isArray(result) && result.id) {
+          loadNote(result as Note)
+        }
       })
     } else {
       setViewMode((globalDefaultView || 'source') as ViewMode)
     }
-  }, [id])
+  }, [notePath])
 
   const save = useCallback(async () => {
     setSaving(true)
     setSaveStatus('saving')
     try {
-      if (id) {
-        await api.updateNote(Number(id), { title, content, tags, is_public: isPublic, pinned })
+      if (note) {
+        await api.updateNote(note.id, { title, content, tags, is_public: isPublic, pinned })
       } else {
         const n = await api.createNote({ title, content, tags, is_public: isPublic, pinned })
         navigate(`/note/${n.id}`, { replace: true })
+        setNote(n)
       }
       setDirty(false)
       setSaveStatus('saved')
@@ -171,11 +210,11 @@ export default function EditorPage({ onRefreshFolders, folders = [], globalDefau
     } finally {
       setSaving(false)
     }
-  }, [id, title, content, tags, isPublic, pinned, navigate, onRefreshFolders])
+  }, [note, title, content, tags, isPublic, pinned, navigate, onRefreshFolders])
 
   // Autosave: debounce 1.5s after last change
   useEffect(() => {
-    if (!dirty || !id) return
+    if (!dirty || !note) return
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
     autosaveTimer.current = setTimeout(() => { save() }, 1500)
     return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current) }
@@ -327,8 +366,8 @@ export default function EditorPage({ onRefreshFolders, folders = [], globalDefau
   }
 
   const handleExport = async () => {
-    if (!id) return
-    const blob = await api.exportNote(Number(id))
+    if (!note) return
+    const blob = await api.exportNote(note.id)
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -346,8 +385,8 @@ export default function EditorPage({ onRefreshFolders, folders = [], globalDefau
   }
 
   const handleDelete = async () => {
-    if (!id || !confirm('Delete this note?')) return
-    await api.deleteNote(Number(id))
+    if (!note || !confirm('Delete this note?')) return
+    await api.deleteNote(note.id)
     onRefreshFolders()
     navigate('/')
   }
@@ -444,6 +483,20 @@ export default function EditorPage({ onRefreshFolders, folders = [], globalDefau
         <button className="btn-ghost" onClick={handleImageButton} title="Insert image" disabled={uploading}>
           <Image size={16} />
         </button>
+        {note && (
+          <button
+            className="btn-ghost"
+            onClick={() => {
+              const url = `${window.location.origin}/note/${note.id}`
+              navigator.clipboard.writeText(url)
+              setCopied(true)
+              setTimeout(() => setCopied(false), 2000)
+            }}
+            title="Copy permalink (stable ID-based URL)"
+          >
+            {copied ? <Check size={16} /> : <Link2 size={16} />}
+          </button>
+        )}
         <button className="btn-ghost" onClick={handleExport} title="Export">
           <Download size={16} />
         </button>

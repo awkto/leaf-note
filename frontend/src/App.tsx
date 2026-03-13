@@ -110,8 +110,8 @@ export default function App() {
     ? decodeURIComponent(location.pathname.slice(7))
     : ''
 
-  // Extract active note ID from URL
-  const noteMatch = location.pathname.match(/^\/note\/(\d+)/)
+  // Extract active note ID from URL (set dynamically when note loads)
+  const noteMatch = location.pathname.match(/^\/note\/(\d+)$/)
   const activeNoteId = noteMatch ? Number(noteMatch[1]) : null
 
   useEffect(() => {
@@ -256,8 +256,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={<NotesPage onRefreshFolders={loadFolders} />} />
           <Route path="/notes/*" element={<NotesPage onRefreshFolders={loadFolders} />} />
-          <Route path="/note/:id" element={<EditorPage onRefreshFolders={loadFolders} folders={folders} globalDefaultView={globalDefaultView} />} />
           <Route path="/note/new" element={<EditorPage onRefreshFolders={loadFolders} folders={folders} globalDefaultView={globalDefaultView} />} />
+          <Route path="/note/*" element={<EditorPage onRefreshFolders={loadFolders} folders={folders} globalDefaultView={globalDefaultView} />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Routes>

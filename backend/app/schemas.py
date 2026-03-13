@@ -71,6 +71,7 @@ class NoteOut(NoteBase):
     id: int
     slug: str
     tags: list[TagOut] = []
+    permalink: str = ""
     created_at: datetime
     updated_at: datetime
     model_config = {"from_attributes": True}

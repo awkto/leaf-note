@@ -43,6 +43,7 @@ export interface NoteSummary {
 
 export interface Note extends NoteSummary {
   content: string
+  permalink: string
 }
 
 export interface SearchResult {
