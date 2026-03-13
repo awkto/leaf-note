@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { NoteSummary } from '../types'
@@ -10,7 +10,7 @@ export default function NotesPage({ folderId, onRefreshFolders }: {
   const navigate = useNavigate()
   const [notes, setNotes] = useState<NoteSummary[]>([])
   const [loading, setLoading] = useState(true)
-  const fileInputRef = useState<HTMLInputElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => { loadNotes() }, [folderId])
 
@@ -101,6 +101,7 @@ export default function NotesPage({ folderId, onRefreshFolders }: {
               <div key={note.id} className="note-item" onClick={() => navigate(`/note/${note.id}`)}>
                 {note.pinned && <Pin size={14} className="pin-icon" />}
                 <span className="title">{note.title}</span>
+                {note.excerpt && <span className="note-excerpt">{note.excerpt}</span>}
                 <div className="tags-row">
                   {note.tags.map(t => (
                     <span key={t.id} className="tag-badge" style={{ borderLeft: `3px solid ${t.color}` }}>

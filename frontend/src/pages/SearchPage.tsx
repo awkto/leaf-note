@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { NoteSummary } from '../types'
@@ -10,14 +10,24 @@ export default function SearchPage() {
   const [results, setResults] = useState<NoteSummary[]>([])
   const [total, setTotal] = useState(0)
   const [searched, setSearched] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const handleSearch = async () => {
-    if (!query.trim()) return
-    const res = await api.search(query)
-    setResults(res.notes)
-    setTotal(res.total)
-    setSearched(true)
-  }
+  useEffect(() => {
+    if (!query.trim()) {
+      setResults([])
+      setTotal(0)
+      setSearched(false)
+      return
+    }
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(async () => {
+      const res = await api.search(query)
+      setResults(res.notes)
+      setTotal(res.total)
+      setSearched(true)
+    }, 300)
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [query])
 
   const formatDate = (d: string) =>
     new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
@@ -28,17 +38,16 @@ export default function SearchPage() {
         <h1>Search</h1>
       </div>
       <div className="page-body">
-        <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+        <div style={{ marginBottom: 24 }}>
           <div className="search-bar" style={{ maxWidth: 'none' }}>
             <Search size={16} />
             <input
               placeholder="Search notes by title or content..."
               value={query}
               onChange={e => setQuery(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSearch()}
+              autoFocus
             />
           </div>
-          <button className="btn-primary" onClick={handleSearch}>Search</button>
         </div>
 
         {searched && (
@@ -50,6 +59,7 @@ export default function SearchPage() {
             <div key={note.id} className="note-item" onClick={() => navigate(`/note/${note.id}`)}>
               {note.pinned && <Pin size={14} className="pin-icon" />}
               <span className="title">{note.title}</span>
+              {note.excerpt && <span className="note-excerpt">{note.excerpt}</span>}
               <div className="tags-row">
                 {note.tags.map(t => (
                   <span key={t.id} className="tag-badge" style={{ borderLeft: `3px solid ${t.color}` }}>

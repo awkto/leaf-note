@@ -10,6 +10,14 @@ from app.routers.folders import resolve_folder_path, ensure_folder_path, build_f
 router = APIRouter(prefix="/api/notes", tags=["notes"])
 
 
+def make_excerpt(content: str, length: int = 120) -> str:
+    """Strip markdown syntax and return a plain-text excerpt."""
+    text = re.sub(r'[#*`~>\[\]!|]', '', content)
+    text = re.sub(r'\(https?://[^\)]+\)', '', text)
+    text = ' '.join(text.split())
+    return text[:length].rstrip() + ('...' if len(text) > length else '')
+
+
 def slugify(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
 
@@ -47,7 +55,14 @@ def list_notes(
     if pinned is not None:
         q = q.filter(Note.pinned == pinned)
     q = q.order_by(Note.pinned.desc(), Note.updated_at.desc())
-    return q.offset(offset).limit(limit).all()
+    notes = q.offset(offset).limit(limit).all()
+    return [
+        NoteSummary(
+            **{k: v for k, v in NoteSummary.model_validate(n).model_dump().items() if k != 'excerpt'},
+            excerpt=make_excerpt(n.content or ''),
+        )
+        for n in notes
+    ]
 
 
 @router.post("", response_model=NoteOut, status_code=201)
@@ -213,7 +228,14 @@ def list_public_notes(
     db: Session = Depends(get_db),
 ):
     q = db.query(Note).options(joinedload(Note.tags)).filter(Note.is_public == True)
-    return q.order_by(Note.updated_at.desc()).offset(offset).limit(limit).all()
+    notes = q.order_by(Note.updated_at.desc()).offset(offset).limit(limit).all()
+    return [
+        NoteSummary(
+            **{k: v for k, v in NoteSummary.model_validate(n).model_dump().items() if k != 'excerpt'},
+            excerpt=make_excerpt(n.content or ''),
+        )
+        for n in notes
+    ]
 
 
 @router.get("/public/{note_id}", response_model=NoteOut)

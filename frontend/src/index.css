@@ -437,6 +437,40 @@ textarea { resize: vertical; min-height: 200px; }
 
 .pin-icon { color: var(--warning); }
 
+.view-toggle {
+  display: flex;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.view-toggle .btn-ghost { border-radius: 0; border: none; }
+.view-toggle .btn-ghost.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.save-status {
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+.save-status[data-status="saved"] { color: var(--accent); }
+.save-status[data-status="saving"] { color: var(--text-muted); }
+.save-status[data-status="unsaved"] { color: var(--warning); }
+
+.note-excerpt {
+  font-size: 12px;
+  color: var(--text-muted);
+  max-width: 400px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Login page */
 .login-page {
   display: flex;

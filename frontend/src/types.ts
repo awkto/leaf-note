@@ -28,6 +28,7 @@ export interface NoteSummary {
   pinned: boolean
   default_view: string | null
   tags: Tag[]
+  excerpt: string
   created_at: string
   updated_at: string
 }

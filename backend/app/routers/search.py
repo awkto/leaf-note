@@ -1,3 +1,4 @@
+import re
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
@@ -5,6 +6,13 @@ from app.database import get_db
 from app.models import Note, Tag, note_tags
 from app.schemas import SearchResult, NoteSummary
 from app.auth import require_auth
+
+
+def make_excerpt(content: str, length: int = 120) -> str:
+    text = re.sub(r'[#*`~>\[\]!|]', '', content)
+    text = re.sub(r'\(https?://[^\)]+\)', '', text)
+    text = ' '.join(text.split())
+    return text[:length].rstrip() + ('...' if len(text) > length else '')
 
 router = APIRouter(prefix="/api/search", tags=["search"])
 
@@ -32,4 +40,11 @@ def search_notes(
 
     total = query.count()
     notes = query.order_by(Note.updated_at.desc()).offset(offset).limit(limit).all()
-    return SearchResult(notes=notes, total=total)
+    summaries = [
+        NoteSummary(
+            **{k: v for k, v in NoteSummary.model_validate(n).model_dump().items() if k != 'excerpt'},
+            excerpt=make_excerpt(n.content or ''),
+        )
+        for n in notes
+    ]
+    return SearchResult(notes=summaries, total=total)
