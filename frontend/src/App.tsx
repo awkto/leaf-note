@@ -12,19 +12,20 @@ import {
   Plus, Leaf, Tag, Home
 } from 'lucide-react'
 
-function FolderTreeItem({ folder, depth = 0, activeFolderId, onSelect }: {
-  folder: FolderTree; depth?: number; activeFolderId: number | null;
-  onSelect: (id: number | null) => void
+function FolderTreeItem({ folder, depth = 0, pathPrefix = '', activePath, onSelect }: {
+  folder: FolderTree; depth?: number; pathPrefix?: string;
+  activePath: string; onSelect: (path: string) => void
 }) {
   const [open, setOpen] = useState(true)
   const hasChildren = folder.children.length > 0
+  const folderPath = pathPrefix ? `${pathPrefix}/${folder.slug}` : folder.slug
 
   return (
     <div>
       <div
-        className={`folder-item ${activeFolderId === folder.id ? 'active' : ''}`}
+        className={`folder-item ${activePath === folderPath ? 'active' : ''}`}
         style={{ paddingLeft: 12 + depth * 16 }}
-        onClick={() => onSelect(folder.id)}
+        onClick={() => onSelect(folderPath)}
       >
         {hasChildren ? (
           <span onClick={(e) => { e.stopPropagation(); setOpen(!open) }}>
@@ -39,7 +40,7 @@ function FolderTreeItem({ folder, depth = 0, activeFolderId, onSelect }: {
         <div className="folder-children">
           {folder.children.map(c => (
             <FolderTreeItem key={c.id} folder={c} depth={depth + 1}
-              activeFolderId={activeFolderId} onSelect={onSelect} />
+              pathPrefix={folderPath} activePath={activePath} onSelect={onSelect} />
           ))}
         </div>
       )}
@@ -51,11 +52,15 @@ export default function App() {
   const location = useLocation()
   const navigate = useNavigate()
   const [folders, setFolders] = useState<FolderTree[]>([])
-  const [activeFolderId, setActiveFolderId] = useState<number | null>(null)
   const [showNewFolder, setShowNewFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
   const [authRequired, setAuthRequired] = useState(false)
   const [globalDefaultView, setGlobalDefaultView] = useState<string>('source')
+
+  // Extract active folder path from URL
+  const activePath = location.pathname.startsWith('/notes/')
+    ? decodeURIComponent(location.pathname.slice(7)) // strip '/notes/'
+    : ''
 
   useEffect(() => {
     api.health().then(h => {
@@ -72,9 +77,24 @@ export default function App() {
     api.getFolderTree().then(setFolders).catch(() => {})
   }
 
+  // Find parent folder ID for creating subfolders
+  const findFolderByPath = (folders: FolderTree[], path: string): FolderTree | null => {
+    const parts = path.split('/')
+    let current: FolderTree | null = null
+    let list = folders
+    for (const part of parts) {
+      current = list.find(f => f.slug === part) || null
+      if (!current) return null
+      list = current.children
+    }
+    return current
+  }
+
+  const activeFolder = activePath ? findFolderByPath(folders, activePath) : null
+
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) return
-    await api.createFolder({ name: newFolderName, parent_id: activeFolderId })
+    await api.createFolder({ name: newFolderName, parent_id: activeFolder?.id ?? null })
     setNewFolderName('')
     setShowNewFolder(false)
     loadFolders()
@@ -124,27 +144,28 @@ export default function App() {
           )}
 
           <div
-            className={`folder-item ${activeFolderId === null ? 'active' : ''}`}
-            onClick={() => { setActiveFolderId(null); navigate('/') }}
+            className={`folder-item ${location.pathname === '/' ? 'active' : ''}`}
+            onClick={() => navigate('/')}
           >
             <span style={{ width: 14 }} />
             <FileText size={14} />
-            <span>Uncategorized</span>
+            <span>All Notes</span>
           </div>
 
           {folders.map(f => (
             <FolderTreeItem
               key={f.id}
               folder={f}
-              activeFolderId={activeFolderId}
-              onSelect={(id) => { setActiveFolderId(id); navigate('/') }}
+              activePath={activePath}
+              onSelect={(path) => navigate(`/notes/${path}`)}
             />
           ))}
         </div>
       </div>
       <div className="main-content">
         <Routes>
-          <Route path="/" element={<NotesPage folderId={activeFolderId} onRefreshFolders={loadFolders} />} />
+          <Route path="/" element={<NotesPage onRefreshFolders={loadFolders} />} />
+          <Route path="/notes/*" element={<NotesPage onRefreshFolders={loadFolders} />} />
           <Route path="/note/:id" element={<EditorPage onRefreshFolders={loadFolders} folders={folders} globalDefaultView={globalDefaultView} />} />
           <Route path="/note/new" element={<EditorPage onRefreshFolders={loadFolders} folders={folders} globalDefaultView={globalDefaultView} />} />
           <Route path="/search" element={<SearchPage />} />

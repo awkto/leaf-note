@@ -37,16 +37,37 @@ def get_or_create_tags(db: Session, tag_names: list[str]) -> list[Tag]:
     return tags
 
 
-@router.get("", response_model=list[NoteSummary])
+def _note_summaries(notes: list[Note]) -> list[NoteSummary]:
+    return [
+        NoteSummary(
+            **{k: v for k, v in NoteSummary.model_validate(n).model_dump().items() if k != 'excerpt'},
+            excerpt=make_excerpt(n.content or ''),
+        )
+        for n in notes
+    ]
+
+
+@router.get("")
 def list_notes(
+    id: int | None = None,
     folder_id: int | None = None,
     tag: str | None = None,
     pinned: bool | None = None,
     limit: int = Query(100, le=1000),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
-    _=Depends(require_auth),
+    user=Depends(require_auth_or_public),
 ):
+    # Single note lookup by ID
+    if id is not None:
+        note = db.query(Note).options(joinedload(Note.tags)).filter(Note.id == id).first()
+        if not note:
+            raise HTTPException(404, "Note not found")
+        from app.config import get_auth_enabled
+        if get_auth_enabled() and user is None and not note.is_public:
+            raise HTTPException(404, "Note not found")
+        return note
+
     q = db.query(Note).options(joinedload(Note.tags))
     if folder_id is not None:
         q = q.filter(Note.folder_id == folder_id)
@@ -55,14 +76,7 @@ def list_notes(
     if pinned is not None:
         q = q.filter(Note.pinned == pinned)
     q = q.order_by(Note.pinned.desc(), Note.updated_at.desc())
-    notes = q.offset(offset).limit(limit).all()
-    return [
-        NoteSummary(
-            **{k: v for k, v in NoteSummary.model_validate(n).model_dump().items() if k != 'excerpt'},
-            excerpt=make_excerpt(n.content or ''),
-        )
-        for n in notes
-    ]
+    return _note_summaries(q.offset(offset).limit(limit).all())
 
 
 @router.post("", response_model=NoteOut, status_code=201)
@@ -176,7 +190,7 @@ def get_note_by_slug(slug: str, db: Session = Depends(get_db), user=Depends(requ
     return note
 
 
-@router.get("/{note_id}", response_model=NoteOut)
+@router.get("/{note_id:int}", response_model=NoteOut)
 def get_note(note_id: int, db: Session = Depends(get_db), user=Depends(require_auth_or_public)):
     note = db.query(Note).options(joinedload(Note.tags)).filter(Note.id == note_id).first()
     if not note:
@@ -187,7 +201,7 @@ def get_note(note_id: int, db: Session = Depends(get_db), user=Depends(require_a
     return note
 
 
-@router.put("/{note_id}", response_model=NoteOut)
+@router.put("/{note_id:int}", response_model=NoteOut)
 def update_note(note_id: int, body: NoteUpdate, db: Session = Depends(get_db), _=Depends(require_auth)):
     note = db.query(Note).options(joinedload(Note.tags)).filter(Note.id == note_id).first()
     if not note:
@@ -212,7 +226,7 @@ def update_note(note_id: int, body: NoteUpdate, db: Session = Depends(get_db), _
     return note
 
 
-@router.delete("/{note_id}", status_code=204)
+@router.delete("/{note_id:int}", status_code=204)
 def delete_note(note_id: int, db: Session = Depends(get_db), _=Depends(require_auth)):
     note = db.get(Note, note_id)
     if not note:
@@ -228,17 +242,10 @@ def list_public_notes(
     db: Session = Depends(get_db),
 ):
     q = db.query(Note).options(joinedload(Note.tags)).filter(Note.is_public == True)
-    notes = q.order_by(Note.updated_at.desc()).offset(offset).limit(limit).all()
-    return [
-        NoteSummary(
-            **{k: v for k, v in NoteSummary.model_validate(n).model_dump().items() if k != 'excerpt'},
-            excerpt=make_excerpt(n.content or ''),
-        )
-        for n in notes
-    ]
+    return _note_summaries(q.order_by(Note.updated_at.desc()).offset(offset).limit(limit).all())
 
 
-@router.get("/public/{note_id}", response_model=NoteOut)
+@router.get("/public/{note_id:int}", response_model=NoteOut)
 def get_public_note(note_id: int, db: Session = Depends(get_db)):
     note = db.query(Note).options(joinedload(Note.tags)).filter(Note.id == note_id).first()
     if not note:
@@ -247,3 +254,47 @@ def get_public_note(note_id: int, db: Session = Depends(get_db)):
     if get_auth_enabled() and not note.is_public:
         raise HTTPException(404, "Note not found")
     return note
+
+
+@router.get("/{path:path}")
+def browse_by_path(path: str, db: Session = Depends(get_db), user=Depends(require_auth_or_public)):
+    """Path-based browsing: /api/notes/folder/subfolder lists notes, /api/notes/folder/subfolder/note-slug returns a note."""
+    path = path.strip("/")
+    if not path:
+        raise HTTPException(404, "Not found")
+
+    # Try full path as a folder → list notes in it
+    folder = resolve_folder_path(db, path)
+    if folder:
+        notes = db.query(Note).options(joinedload(Note.tags)).filter(
+            Note.folder_id == folder.id
+        ).order_by(Note.pinned.desc(), Note.updated_at.desc()).all()
+        return _note_summaries(notes)
+
+    # Try all-but-last as folder + last segment as note slug
+    parts = path.rsplit("/", 1)
+    if len(parts) == 2:
+        folder_path, note_slug = parts
+        folder = resolve_folder_path(db, folder_path)
+        if folder:
+            note = db.query(Note).options(joinedload(Note.tags)).filter(
+                Note.slug == note_slug, Note.folder_id == folder.id
+            ).first()
+            if note:
+                from app.config import get_auth_enabled
+                if get_auth_enabled() and user is None and not note.is_public:
+                    raise HTTPException(404, "Not found")
+                return note
+
+    # Single segment: try as root-level note slug (no folder)
+    if "/" not in path:
+        note = db.query(Note).options(joinedload(Note.tags)).filter(
+            Note.slug == path, Note.folder_id == None
+        ).first()
+        if note:
+            from app.config import get_auth_enabled
+            if get_auth_enabled() and user is None and not note.is_public:
+                raise HTTPException(404, "Not found")
+            return note
+
+    raise HTTPException(404, "Not found")

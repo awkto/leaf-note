@@ -1,33 +1,49 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { api } from '../api'
-import { NoteSummary } from '../types'
+import { NoteSummary, Folder } from '../types'
 import { Plus, FileText, Pin, Download, Upload, Trash2 } from 'lucide-react'
 
-export default function NotesPage({ folderId, onRefreshFolders }: {
-  folderId: number | null; onRefreshFolders: () => void
+export default function NotesPage({ onRefreshFolders }: {
+  onRefreshFolders: () => void
 }) {
   const navigate = useNavigate()
+  const location = useLocation()
   const [notes, setNotes] = useState<NoteSummary[]>([])
   const [loading, setLoading] = useState(true)
+  const [folder, setFolder] = useState<Folder | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
-  useEffect(() => { loadNotes() }, [folderId])
+  // Extract folder path from URL: /notes/infrastructure/docker → infrastructure/docker
+  const folderPath = location.pathname.startsWith('/notes/')
+    ? decodeURIComponent(location.pathname.slice(7))
+    : null
 
-  const loadNotes = () => {
+  useEffect(() => {
     setLoading(true)
-    const params: Record<string, string> = {}
-    if (folderId !== null) params.folder_id = String(folderId)
-    api.listNotes(params).then(setNotes).catch(() => {}).finally(() => setLoading(false))
-  }
+    setFolder(null)
+
+    if (folderPath) {
+      // Path-based: fetch folder info and notes via path
+      Promise.all([
+        api.getFolderByPath(folderPath).catch(() => null),
+        api.browseByPath(folderPath).catch(() => []),
+      ]).then(([f, n]) => {
+        setFolder(f)
+        setNotes(Array.isArray(n) ? n : [])
+      }).finally(() => setLoading(false))
+    } else {
+      // Root: all notes
+      api.listNotes().then(setNotes).catch(() => {}).finally(() => setLoading(false))
+    }
+  }, [folderPath])
 
   const handleNew = async () => {
-    const note = await api.createNote({
-      title: 'Untitled',
-      content: '',
-      folder_id: folderId,
-      tags: [],
-    })
+    const data: any = { title: 'Untitled', content: '', tags: [] }
+    if (folder) {
+      data.folder_id = folder.id
+    }
+    const note = await api.createNote(data)
     onRefreshFolders()
     navigate(`/note/${note.id}`)
   }
@@ -37,7 +53,12 @@ export default function NotesPage({ folderId, onRefreshFolders }: {
     if (!confirm('Delete this note?')) return
     await api.deleteNote(id)
     onRefreshFolders()
-    loadNotes()
+    // Reload
+    if (folderPath) {
+      api.browseByPath(folderPath).then(n => setNotes(Array.isArray(n) ? n : []))
+    } else {
+      api.listNotes().then(setNotes)
+    }
   }
 
   const handleExportAll = async () => {
@@ -52,8 +73,12 @@ export default function NotesPage({ folderId, onRefreshFolders }: {
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return
-    await api.importMarkdown(e.target.files, folderId ?? undefined)
-    loadNotes()
+    await api.importMarkdown(e.target.files, folder?.id)
+    if (folderPath) {
+      api.browseByPath(folderPath).then(n => setNotes(Array.isArray(n) ? n : []))
+    } else {
+      api.listNotes().then(setNotes)
+    }
     onRefreshFolders()
   }
 
@@ -62,20 +87,31 @@ export default function NotesPage({ folderId, onRefreshFolders }: {
     return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
   }
 
+  const title = folderPath
+    ? folderPath.split('/').pop() || 'Notes'
+    : 'All Notes'
+
   return (
     <>
       <div className="page-header">
-        <h1>{folderId ? 'Folder Notes' : 'All Notes'}</h1>
+        <div>
+          <h1>{title}</h1>
+          {folderPath && (
+            <div className="text-sm text-muted" style={{ marginTop: 2 }}>
+              {folderPath}
+            </div>
+          )}
+        </div>
         <div className="flex gap-2">
           <input
+            ref={fileInputRef}
             type="file"
             accept=".md,.zip"
             multiple
             style={{ display: 'none' }}
-            id="import-input"
             onChange={handleImport}
           />
-          <button className="btn-secondary btn-sm" onClick={() => document.getElementById('import-input')?.click()}>
+          <button className="btn-secondary btn-sm" onClick={() => fileInputRef.current?.click()}>
             <Upload size={14} /> Import
           </button>
           <button className="btn-secondary btn-sm" onClick={handleExportAll}>

@@ -33,6 +33,10 @@ export const api = {
     fetch(`/api/notes/${id}`, { method: 'PUT', headers: getHeaders(), body: JSON.stringify(data) }).then(handleRes),
   deleteNote: (id: number) =>
     fetch(`/api/notes/${id}`, { method: 'DELETE', headers: getHeaders() }).then(handleRes),
+  browseByPath: (path: string) =>
+    fetch(`/api/notes/${path}`, { headers: getHeaders() }).then(handleRes),
+  getFolderByPath: (path: string) =>
+    fetch(`/api/folders/by-path/${path}`, { headers: getHeaders() }).then(handleRes),
 
   // Folders
   listFolders: (parentId?: number) => {
