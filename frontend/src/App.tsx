@@ -1,7 +1,7 @@
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { api } from './api'
-import { FolderTree, Settings } from './types'
+import { FolderTree, Settings as SettingsType } from './types'
 import NotesPage from './pages/NotesPage'
 import EditorPage from './pages/EditorPage'
 import SearchPage from './pages/SearchPage'
@@ -61,7 +61,7 @@ export default function App() {
     api.health().then(h => {
       loadFolders()
     }).catch(() => {})
-    api.getSettings().then((s: Settings) => {
+    api.getSettings().then((s: SettingsType) => {
       setGlobalDefaultView(s.default_view || 'source')
     }).catch(err => {
       if (err.message === 'Unauthorized') setAuthRequired(true)
