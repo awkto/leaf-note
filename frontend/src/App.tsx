@@ -1,7 +1,7 @@
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { api } from './api'
-import { FolderTree, Settings as SettingsType } from './types'
+import { FolderTree, FolderNoteRef, NoteSummary, Settings as SettingsType } from './types'
 import NotesPage from './pages/NotesPage'
 import EditorPage from './pages/EditorPage'
 import SearchPage from './pages/SearchPage'
@@ -9,15 +9,28 @@ import SettingsPage from './pages/SettingsPage'
 import LoginPage from './pages/LoginPage'
 import {
   FileText, Search, Settings, FolderOpen, ChevronRight, ChevronDown,
-  Plus, Leaf, Tag, Home
+  Plus, Leaf, Pin, Home
 } from 'lucide-react'
 
-function FolderTreeItem({ folder, depth = 0, pathPrefix = '', activePath, onSelect }: {
+function NoteItem({ note, active }: { note: FolderNoteRef | NoteSummary; active: boolean }) {
+  const navigate = useNavigate()
+  return (
+    <div
+      className={`sidebar-note ${active ? 'active' : ''}`}
+      onClick={() => navigate(`/note/${note.id}`)}
+    >
+      {note.pinned && <Pin size={10} className="pin-icon" />}
+      <span>{note.title}</span>
+    </div>
+  )
+}
+
+function FolderTreeItem({ folder, depth = 0, pathPrefix = '', activePath, activeNoteId, onSelect }: {
   folder: FolderTree; depth?: number; pathPrefix?: string;
-  activePath: string; onSelect: (path: string) => void
+  activePath: string; activeNoteId: number | null; onSelect: (path: string) => void
 }) {
   const [open, setOpen] = useState(true)
-  const hasChildren = folder.children.length > 0
+  const hasChildren = folder.children.length > 0 || folder.notes.length > 0
   const folderPath = pathPrefix ? `${pathPrefix}/${folder.slug}` : folder.slug
 
   return (
@@ -40,7 +53,10 @@ function FolderTreeItem({ folder, depth = 0, pathPrefix = '', activePath, onSele
         <div className="folder-children">
           {folder.children.map(c => (
             <FolderTreeItem key={c.id} folder={c} depth={depth + 1}
-              pathPrefix={folderPath} activePath={activePath} onSelect={onSelect} />
+              pathPrefix={folderPath} activePath={activePath} activeNoteId={activeNoteId} onSelect={onSelect} />
+          ))}
+          {folder.notes.map(n => (
+            <NoteItem key={n.id} note={n} active={activeNoteId === n.id} />
           ))}
         </div>
       )}
@@ -52,6 +68,7 @@ export default function App() {
   const location = useLocation()
   const navigate = useNavigate()
   const [folders, setFolders] = useState<FolderTree[]>([])
+  const [rootNotes, setRootNotes] = useState<NoteSummary[]>([])
   const [showNewFolder, setShowNewFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
   const [authRequired, setAuthRequired] = useState(false)
@@ -59,11 +76,15 @@ export default function App() {
 
   // Extract active folder path from URL
   const activePath = location.pathname.startsWith('/notes/')
-    ? decodeURIComponent(location.pathname.slice(7)) // strip '/notes/'
+    ? decodeURIComponent(location.pathname.slice(7))
     : ''
 
+  // Extract active note ID from URL
+  const noteMatch = location.pathname.match(/^\/note\/(\d+)/)
+  const activeNoteId = noteMatch ? Number(noteMatch[1]) : null
+
   useEffect(() => {
-    api.health().then(h => {
+    api.health().then(() => {
       loadFolders()
     }).catch(() => {})
     api.getSettings().then((s: SettingsType) => {
@@ -75,6 +96,7 @@ export default function App() {
 
   const loadFolders = () => {
     api.getFolderTree().then(setFolders).catch(() => {})
+    api.listNotes({ root: 'true' }).then(setRootNotes).catch(() => {})
   }
 
   // Find parent folder ID for creating subfolders
@@ -143,23 +165,24 @@ export default function App() {
             </div>
           )}
 
-          <div
-            className={`folder-item ${location.pathname === '/' ? 'active' : ''}`}
-            onClick={() => navigate('/')}
-          >
-            <span style={{ width: 14 }} />
-            <FileText size={14} />
-            <span>All Notes</span>
-          </div>
-
           {folders.map(f => (
             <FolderTreeItem
               key={f.id}
               folder={f}
               activePath={activePath}
+              activeNoteId={activeNoteId}
               onSelect={(path) => navigate(`/notes/${path}`)}
             />
           ))}
+
+          {rootNotes.length > 0 && (
+            <>
+              <div className="sidebar-section">Uncategorized</div>
+              {rootNotes.map(n => (
+                <NoteItem key={n.id} note={n} active={activeNoteId === n.id} />
+              ))}
+            </>
+          )}
         </div>
       </div>
       <div className="main-content">

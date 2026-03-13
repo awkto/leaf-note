@@ -34,9 +34,17 @@ class FolderOut(FolderBase):
     updated_at: datetime
     model_config = {"from_attributes": True}
 
+class FolderNoteRef(BaseModel):
+    id: int
+    title: str
+    slug: str
+    pinned: bool = False
+    model_config = {"from_attributes": True}
+
 class FolderTree(FolderOut):
     children: list["FolderTree"] = []
     note_count: int = 0
+    notes: list[FolderNoteRef] = []
 
 
 class NoteBase(BaseModel):

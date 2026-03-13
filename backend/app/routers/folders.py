@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Folder, Note
-from app.schemas import FolderCreate, FolderUpdate, FolderOut, FolderTree
+from app.schemas import FolderCreate, FolderUpdate, FolderOut, FolderTree, FolderNoteRef
 from app.auth import require_auth
 
 router = APIRouter(prefix="/api/folders", tags=["folders"])
@@ -18,6 +18,7 @@ def build_tree(folders: list[Folder], parent_id: int | None = None) -> list[Fold
     for f in folders:
         if f.parent_id == parent_id:
             children = build_tree(folders, f.id)
+            sorted_notes = sorted(f.notes, key=lambda n: (not n.pinned, n.title.lower()))
             result.append(FolderTree(
                 id=f.id, name=f.name, slug=f.slug,
                 parent_id=f.parent_id,
@@ -25,6 +26,7 @@ def build_tree(folders: list[Folder], parent_id: int | None = None) -> list[Fold
                 created_at=f.created_at, updated_at=f.updated_at,
                 children=children,
                 note_count=len(f.notes),
+                notes=[FolderNoteRef(id=n.id, title=n.title, slug=n.slug, pinned=n.pinned) for n in sorted_notes],
             ))
     return result
 

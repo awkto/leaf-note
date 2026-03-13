@@ -151,6 +151,23 @@ textarea { resize: vertical; min-height: 200px; }
 .folder-item .count { margin-left: auto; font-size: 11px; color: var(--text-muted); }
 .folder-children { padding-left: 16px; }
 
+.sidebar-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 28px;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar-note:hover { color: var(--text); background: var(--bg-tertiary); }
+.sidebar-note.active { color: var(--accent); background: var(--bg-tertiary); }
+.sidebar-note span { overflow: hidden; text-overflow: ellipsis; }
+
 .main-content {
   flex: 1;
   overflow-y: auto;

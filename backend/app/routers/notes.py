@@ -51,6 +51,7 @@ def _note_summaries(notes: list[Note]) -> list[NoteSummary]:
 def list_notes(
     id: int | None = None,
     folder_id: int | None = None,
+    root: bool = False,
     tag: str | None = None,
     pinned: bool | None = None,
     limit: int = Query(100, le=1000),
@@ -69,7 +70,9 @@ def list_notes(
         return note
 
     q = db.query(Note).options(joinedload(Note.tags))
-    if folder_id is not None:
+    if root:
+        q = q.filter(Note.folder_id == None)
+    elif folder_id is not None:
         q = q.filter(Note.folder_id == folder_id)
     if tag:
         q = q.join(note_tags).join(Tag).filter(Tag.name == tag.lower())

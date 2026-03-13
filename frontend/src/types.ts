@@ -14,9 +14,17 @@ export interface Folder {
   updated_at: string
 }
 
+export interface FolderNoteRef {
+  id: number
+  title: string
+  slug: string
+  pinned: boolean
+}
+
 export interface FolderTree extends Folder {
   children: FolderTree[]
   note_count: number
+  notes: FolderNoteRef[]
 }
 
 export interface NoteSummary {
