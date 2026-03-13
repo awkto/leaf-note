@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
+import rehypeRaw from 'rehype-raw'
 import { api } from '../api'
 import { Note, Tag, FolderTree } from '../types'
 import { Save, ArrowLeft, Eye, Edit3, Pin, Globe, Download, Trash2, Image } from 'lucide-react'
@@ -399,7 +400,7 @@ export default function EditorPage({ onRefreshFolders, folders = [], globalDefau
         ) : (
           <div className="preview-pane" style={{ flex: 1 }}>
             <div className="markdown-body">
-              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw, rehypeHighlight]}>
                 {content}
               </ReactMarkdown>
             </div>
