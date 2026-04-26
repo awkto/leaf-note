@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Table
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Table, LargeBinary
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -53,3 +53,14 @@ class Tag(Base):
     color = Column(String(7), default="#6366f1")
 
     notes = relationship("Note", secondary=note_tags, back_populates="tags")
+
+
+class Image(Base):
+    __tablename__ = "images"
+
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String(80), nullable=False, unique=True, index=True)
+    content_type = Column(String(100), nullable=False)
+    size_bytes = Column(Integer, nullable=False)
+    data = Column(LargeBinary, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
