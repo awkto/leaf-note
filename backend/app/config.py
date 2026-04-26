@@ -10,6 +10,36 @@ IMAGES_DIR = DATA_DIR / "images"
 
 APP_VERSION = os.environ.get("APP_VERSION", "dev")
 
+# ---------------------------------------------------------------------------
+# HA / replication
+# ---------------------------------------------------------------------------
+
+HA_ENABLED = os.getenv("HA_ENABLED", "").lower() in ("true", "1", "yes")
+HA_SELF_ID = os.getenv("HA_SELF_ID", "A")
+HA_INITIAL_ROLE = os.getenv("HA_INITIAL_ROLE", "primary")
+HA_PEER_URL = os.getenv("HA_PEER_URL", "")
+HA_TOKEN = os.getenv("HA_TOKEN", "")
+HA_STATE_PATH = os.getenv("HA_STATE_PATH", str(DATA_DIR / "ha.json"))
+
+# ---------------------------------------------------------------------------
+# Backups
+# ---------------------------------------------------------------------------
+
+BACKUP_DIR = os.getenv("BACKUP_DIR", str(DATA_DIR / "backups"))
+BACKUP_INTERVAL_SECONDS = int(os.getenv("BACKUP_INTERVAL_SECONDS", "900"))
+BACKUP_RETENTION_DAYS = int(os.getenv("BACKUP_RETENTION_DAYS", "14"))
+
+# ---------------------------------------------------------------------------
+# Settings encryption
+# ---------------------------------------------------------------------------
+
+# Key-encryption-key for Fernet-wrapping secrets in the settings table.
+# If unset, a key is auto-generated at first boot and persisted to
+# SETTINGS_KEK_PATH. For HA, the KEK travels in the pairing bundle so both
+# nodes can decrypt secrets that replicate via the DB.
+SETTINGS_KEK = os.getenv("SETTINGS_KEK", "")
+SETTINGS_KEK_PATH = os.getenv("SETTINGS_KEK_PATH", str(DATA_DIR / "settings-kek"))
+
 
 def ensure_dirs():
     DATA_DIR.mkdir(parents=True, exist_ok=True)

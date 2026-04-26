@@ -13,6 +13,11 @@ WORKDIR /app
 ARG APP_VERSION=""
 ENV APP_VERSION=${APP_VERSION}
 
+# sqlite3 CLI is required for atomic .backup snapshots used by HA replication
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends sqlite3 \
+ && rm -rf /var/lib/apt/lists/*
+
 # Install dependencies
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

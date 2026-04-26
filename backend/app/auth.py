@@ -91,3 +91,20 @@ def require_auth_or_public(
         return payload.get("sub", "admin")
     except JWTError:
         return None
+
+
+def is_first_run() -> bool:
+    """No admin password configured yet -- used to allow pairing on a fresh standby."""
+    return get_admin_password_hash() is None
+
+
+def validate_bearer(token: str) -> bool:
+    """Validate a raw bearer string. Used by the HA router."""
+    api_key = get_api_key()
+    if api_key and token == api_key:
+        return True
+    try:
+        jwt.decode(token, _get_jwt_secret(), algorithms=[JWT_ALGORITHM])
+        return True
+    except JWTError:
+        return False
