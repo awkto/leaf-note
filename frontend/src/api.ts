@@ -113,4 +113,33 @@ export const api = {
     fetch('/api/settings/default-view', { method: 'PUT', headers: getHeaders(), body: JSON.stringify({ default_view: view }) }).then(handleRes),
   health: () =>
     fetch('/api/health').then(handleRes),
+
+  // HA / replication
+  haStatus: () =>
+    fetch('/api/ha/status').then(handleRes),
+  haGeneratePairing: (myBaseUrl: string) =>
+    fetch('/api/ha/generate-pairing', {
+      method: 'POST', headers: getHeaders(),
+      body: JSON.stringify({ my_base_url: myBaseUrl }),
+    }).then(handleRes),
+  haAcceptPairing: (pairingSecret: string, myBaseUrl: string) =>
+    fetch('/api/ha/accept-pairing', {
+      method: 'POST', headers: getHeaders(),
+      body: JSON.stringify({ pairing_secret: pairingSecret, my_base_url: myBaseUrl }),
+    }).then(handleRes),
+  haSyncNow: () =>
+    fetch('/api/ha/sync-now', { method: 'POST', headers: getHeaders() }).then(handleRes),
+  haFailover: (force: boolean) =>
+    fetch('/api/ha/failover', {
+      method: 'POST', headers: getHeaders(),
+      body: JSON.stringify({ force }),
+    }).then(handleRes),
+  haLeaveCluster: () =>
+    fetch('/api/ha/leave-cluster', { method: 'POST', headers: getHeaders() }).then(handleRes),
+  haUpdateConfig: (body: { replication_paused?: boolean; sync_interval_seconds?: number }) =>
+    fetch('/api/ha/config', {
+      method: 'PUT', headers: getHeaders(), body: JSON.stringify(body),
+    }).then(handleRes),
+  haTriggerBackup: () =>
+    fetch('/api/ha/backup', { method: 'POST', headers: getHeaders() }).then(handleRes),
 }

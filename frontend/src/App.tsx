@@ -7,9 +7,10 @@ import EditorPage from './pages/EditorPage'
 import SearchPage from './pages/SearchPage'
 import SettingsPage from './pages/SettingsPage'
 import LoginPage from './pages/LoginPage'
+import ClusterPage from './pages/ClusterPage'
 import {
   FileText, Search, Settings, FolderOpen, ChevronRight, ChevronDown,
-  Plus, Leaf, Pin, Home, Lock, Unlock
+  Plus, Leaf, Pin, Home, Lock, Unlock, Network
 } from 'lucide-react'
 
 function NoteItem({ note, active, editMode, onDragStart }: {
@@ -186,6 +187,9 @@ export default function App() {
           <Link to="/settings" className={`sidebar-link ${isActive('/settings')}`}>
             <Settings size={18} /> Settings
           </Link>
+          <Link to="/cluster" className={`sidebar-link ${isActive('/cluster')}`}>
+            <Network size={18} /> Cluster
+          </Link>
 
           <div className="sidebar-section flex items-center justify-between">
             <span>Folders</span>
@@ -260,6 +264,7 @@ export default function App() {
           <Route path="/note/*" element={<EditorPage onRefreshFolders={loadFolders} folders={folders} globalDefaultView={globalDefaultView} />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/cluster" element={<ClusterPage />} />
         </Routes>
       </div>
     </div>

@@ -57,3 +57,41 @@ export interface Settings {
   version: string
   default_view: string
 }
+
+export interface ReplicaMeta {
+  last_pushed_data_version?: number
+  last_pushed_at?: string
+  last_pushed_size_bytes?: number
+  last_pushed_raw_bytes?: number
+  last_received_data_version?: string
+  last_received_at?: string
+  last_received_size_bytes?: number
+  last_received_raw_bytes?: number
+  sender_id?: string
+  last_seen_peer_at?: string
+  peer_replication_paused?: boolean
+}
+
+export interface BackupInfo {
+  name: string
+  size_bytes: number
+  mtime: string
+}
+
+export interface HAStatus {
+  enabled: boolean
+  role: 'primary' | 'standby'
+  self_id?: string
+  peer_id?: string
+  peer_url?: string
+  peer_reachable?: boolean
+  peer_role?: string | null
+  replication_paused?: boolean
+  is_orphaned?: boolean
+  last_promoted_at?: string | null
+  last_demoted_at?: string | null
+  sync_interval_seconds?: number
+  replica_meta?: ReplicaMeta
+  last_backup?: BackupInfo | null
+  data_version?: number | null
+}
